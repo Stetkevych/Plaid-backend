@@ -1,71 +1,127 @@
-import { Configuration, PlaidApi, PlaidEnvironments } from "plaid";
-import nodemailer from "nodemailer";
+// --- FILE: lib/plaid.js (Plaid Client Shared Instance) ---
+import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid';
 
-const plaid = new PlaidApi(
-  new Configuration({
-    basePath: PlaidEnvironments.production,
-    baseOptions: {
-      headers: {
-        "PLAID-CLIENT-ID": process.env.PLAID_CLIENT_ID,
-        "PLAID-SECRET": process.env.PLAID_SECRET
-      }
-    }
-  })
-);
+const configuration = new Configuration({
+  basePath: PlaidEnvironments[process.env.PLAID_ENV],
+  baseOptions: {
+    headers: {
+      'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID,
+      'PLAID-SECRET': process.env.PLAID_SECRET,
+    },
+  },
+});
 
-export default async function handler(req, res) {
-  // Allow browser calls
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+export const plaidClient = new PlaidApi(configuration);
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
+
+// --- FILE: app/api/plaid/create-link-token/route.js ---
+import { plaidClient } from '@/lib/plaid';
+import { NextResponse } from 'next/server';
+
+export async function POST() {
+  try {
+    const configs = {
+      user: { client_user_id: 'user-id-from-your-session' },
+      client_name: 'Your App Name',
+      products: ['transactions', 'statements'], // MUST include 'statements'
+      country_codes: ['US'],
+      language: 'en',
+    };
+    const response = await plaidClient.linkTokenCreate(configs);
+    return NextResponse.json(response.data);
+  } catch (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
+}
 
-  // GET = create link token
-  if (req.method === "GET") {
-    const link = await plaid.linkTokenCreate({
-      user: { client_user_id: "sales-client" },
-      client_name: "Sales Pipeline",
-      products: ["assets"],
-      country_codes: ["US"],
-      language: "en"
+
+// --- FILE: app/api/plaid/process-statements/route.js ---
+import { plaidClient } from '@/lib/plaid';
+import { NextResponse } from 'next/server';
+import nodemailer from 'nodemailer';
+
+export async function POST(req) {
+  try {
+    const { public_token, user_email } = await req.json();
+
+    // 1. Exchange public_token for access_token
+    const exchangeResponse = await plaidClient.itemPublicTokenExchange({ public_token });
+    const accessToken = exchangeResponse.data.access_token;
+
+    // 2. Fetch Statement List
+    const listResponse = await plaidClient.statementsList({ access_token: accessToken });
+    const account = listResponse.data.accounts[0];
+    const statement = account?.statements[0];
+
+    if (!statement) {
+      return NextResponse.json({ error: 'No statements found for this account' }, { status: 404 });
+    }
+
+    // 3. Download Statement PDF
+    const downloadResponse = await plaidClient.statementsDownload(
+      { access_token: accessToken, statement_id: statement.statement_id },
+      { responseType: 'arraybuffer' }
+    );
+
+    // 4. Send Email
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: 587,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
     });
 
-    return res.json({ link_token: link.data.link_token });
+    await transporter.sendMail({
+      from: '"Statement Bot" <no-reply@yourapp.com>',
+      to: user_email,
+      subject: `Your ${statement.month}/${statement.year} Bank Statement`,
+      text: "Attached is the statement you requested via Plaid.",
+      attachments: [{
+        filename: `statement_${statement.month}_${statement.year}.pdf`,
+        content: Buffer.from(downloadResponse.data),
+        contentType: 'application/pdf'
+      }]
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Statement Error:", error.response?.data || error.message);
+    return NextResponse.json({ error: 'Failed to process request' }, { status: 500 });
   }
+}
 
-  // POST = exchange token, pull data, email it
-  const { public_token } = req.body;
 
-  const exchange = await plaid.itemPublicTokenExchange({
-    public_token
+// --- FILE: components/PlaidButton.js (Frontend React Component) ---
+'use client';
+import { useState, useEffect } from 'react';
+import { usePlaidLink } from 'react-plaid-link';
+
+export default function PlaidButton({ userEmail }) {
+  const [linkToken, setLinkToken] = useState(null);
+
+  useEffect(() => {
+    // Get the link_token from our backend on mount
+    fetch('/api/plaid/create-link-token', { method: 'POST' })
+      .then(res => res.json())
+      .then(data => setLinkToken(data.link_token));
+  }, []);
+
+  const onSuccess = async (public_token, metadata) => {
+    // Send public_token to our processing route
+    await fetch('/api/plaid/process-statements', {
+      method: 'POST',
+      body: JSON.stringify({ public_token, user_email: userEmail }),
+    });
+    alert('Statement is being emailed!');
+  };
+
+  const { open, ready } = usePlaidLink({
+    token: linkToken,
+    onSuccess,
   });
 
-  const access_token = exchange.data.access_token;
-
-  const report = await plaid.assetReportCreate({
-    access_tokens: [access_token],
-    days_requested: 60
-  });
-
-  // Send email
-  const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    }
-  });
-
-  await transporter.sendMail({
-    to: process.env.RECEIVE_EMAIL,
-    subject: "Client Bank Statements",
-    text: JSON.stringify(report.data, null, 2)
-  });
-
-  res.status(200).json({ success: true });
+  return (
+    <button onClick={() => open()} disabled={!ready}>
+      Connect Bank & Send Statement
+    </button>
+  );
 }
