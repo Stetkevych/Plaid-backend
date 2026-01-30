@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <title>Secure Bank Connection</title>
 
-    <!-- Plaid Link -->
+    <!-- Plaid Link SDK -->
     <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
 
     <style>
@@ -55,6 +55,11 @@
         opacity: 0.95;
       }
 
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
       .footer {
         margin-top: 20px;
         font-size: 12px;
@@ -71,49 +76,7 @@
         statements for review.
       </p>
 
-      <button id="link-button">Connect Bank Securely</button>
+      <button id="link-button" disabled>Initializing…</button>
 
       <div class="footer">
-        Powered by Plaid · Bank-level encryption · Capital Infusion Underwriting
-      </div>
-    </div>
-
-    <script>
-      const BACKEND_URL = "https://YOUR-VERCEL-URL";
-
-      async function createLinkToken() {
-  console.log("Requesting link token...");
-  const res = await fetch(`${BACKEND_URL}/api/create_link_token`);
-  const data = await res.json();
-  console.log("Link token response:", data);
-  return data.link_token;
-}
-
-      async function initPlaid() {
-        const linkToken = await createLinkToken();
-
-        const handler = Plaid.create({
-          token: linkToken,
-          onSuccess: async (public_token) => {
-            await fetch(`${BACKEND_URL}/api/exchange_token`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ public_token }),
-            });
-
-            alert("Bank connected successfully. You’re all set.");
-          },
-          onExit: (err) => {
-            if (err) console.error(err);
-          },
-        });
-
-        document
-          .getElementById("link-button")
-          .addEventListener("click", () => handler.open());
-      }
-
-      initPlaid();
-    </script>
-  </body>
-</html>
+        Powered by Plaid · Bank-level encryption · Capital Infusion Und
