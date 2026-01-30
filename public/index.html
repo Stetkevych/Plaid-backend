@@ -1,52 +1,125 @@
-<script>
-  const button = document.getElementById("link-button");
-  const originalText = button.textContent;
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Secure Bank Connection</title>
 
-  function fail(msg) {
-    button.disabled = true;
-    button.textContent = msg || "Unable to initialize";
-  }
+    <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
 
-  async function createLinkToken() {
-    const res = await fetch("/api/create_link_token", { method: "POST" });
-    const text = await res.text();
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: linear-gradient(135deg, #e6f7f2, #e8f0ff);
+        height: 100vh;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .card {
+        background: white;
+        padding: 40px;
+        border-radius: 12px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+        max-width: 420px;
+        width: 100%;
+        text-align: center;
+      }
+      h1 { color: #0f766e; margin-bottom: 10px; }
+      p { color: #475569; font-size: 15px; margin-bottom: 18px; }
+      input {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        margin-bottom: 14px;
+        outline: none;
+      }
+      input:focus { border-color: #60a5fa; }
+      button {
+        background: linear-gradient(135deg, #22c55e, #3b82f6);
+        color: white;
+        border: none;
+        padding: 14px 24px;
+        font-size: 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        width: 100%;
+        font-weight: 600;
+      }
+      button:hover { opacity: 0.95; }
+      button:disabled { opacity: 0.6; cursor: not-allowed; }
+      .footer { margin-top: 16px; font-size: 12px; color: #64748b; }
+      .status { margin-top: 10px; font-size: 12px; color: #64748b; min-height: 16px; }
+    </style>
+  </head>
 
-    if (!res.ok) throw new Error(text || "create_link_token failed");
+  <body>
+    <div class="card">
+      <h1>Connect Your Bank</h1>
+      <p>Securely connect your bank account for underwriting review.</p>
 
-    const data = JSON.parse(text);
-    if (!data.link_token) throw new Error("No link_token returned");
+      <input id="email" type="email" placeholder="Work email (required)" autocomplete="email" />
 
-    return data.link_token;
-  }
+      <button id="link-button" disabled>Initializing…</button>
+      <div class="status" id="status"></div>
 
-  async function initPlaid() {
-    try {
-      if (!window.Plaid) throw new Error("Plaid SDK not loaded");
+      <div class="footer">Powered by Plaid · Bank-level encryption</div>
+    </div>
 
-      const linkToken = await createLinkToken();
+    <script>
+      const button = document.getElementById("link-button");
+      const statusEl = document.getElementById("status");
+      const emailEl = document.getElementById("email");
 
-      const handler = Plaid.create({
-        token: linkToken,
-        onSuccess: (public_token) => {
-          console.log("Success public_token:", public_token);
-          alert("Connected (success callback fired). Next: exchange_token + store.");
-        },
-        onExit: (err) => {
-          if (err) console.error(err);
-        },
-      });
+      function setStatus(msg) { statusEl.textContent = msg || ""; }
 
-      button.disabled = false;
-      button.textContent = originalText || "Connect Bank Securely";
-      button.addEventListener("click", () => handler.open());
-    } catch (e) {
-      console.error(e);
-      fail("Backend not ready");
-    }
-  }
+      async function createLinkToken() {
+        const res = await fetch("/api/create_link_token", { method: "POST" });
+        const text = await res.text();
+        if (!res.ok) throw new Error(text || "Failed to create link token");
+        const data = JSON.parse(text);
+        if (!data.link_token) throw new Error("No link_token returned");
+        return data.link_token;
+      }
 
-  // Start
-  button.disabled = true;
-  button.textContent = "Initializing…";
-  initPlaid();
-</script>
+      async function initPlaid() {
+        try {
+          if (!window.Plaid) throw new Error("Plaid SDK not loaded");
+
+          const linkToken = await createLinkToken();
+
+          const handler = Plaid.create({
+            token: linkToken,
+            onSuccess: async (public_token) => {
+              // For now: just prove success end-to-end.
+              // Next step we’ll exchange + email notify.
+              alert("Connected! Next: exchange token + notify email.");
+              console.log("public_token:", public_token);
+            },
+            onExit: (err) => { if (err) console.error(err); }
+          });
+
+          button.disabled = false;
+          button.textContent = "Connect Bank Securely";
+          setStatus("");
+
+          button.addEventListener("click", () => {
+            const email = (emailEl.value || "").trim();
+            if (!email) return setStatus("Enter your email first.");
+            setStatus("");
+            handler.open();
+          });
+        } catch (err) {
+          console.error(err);
+          button.disabled = true;
+          button.textContent = "Unable to initialize";
+          setStatus("Backend not ready (check /api/create_link_token POST).");
+        }
+      }
+
+      initPlaid();
+    </script>
+  </body>
+</html>
