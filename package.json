@@ -1,9 +1,9 @@
 {
   "name": "plaid-vercel",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "dependencies": {
-    "plaid": "^20.0.0",
-    "resend": "^3.2.0"
+    "plaid": "^20.0.0"
   }
 }
