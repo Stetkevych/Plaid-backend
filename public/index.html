@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Connect Your Bank</title>
+    <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+  </head>
+  <body>
+    <h2>Connect your bank account</h2>
+
+    <label for="email">Enter your email:</label>
+    <input type="email" id="email" placeholder="you@example.com" />
+
+    <button id="link-button">Link Bank</button>
+
+    <script>
+      // THIS IS YOUR LIVE VERCEL BACKEND
+      const BACKEND_URL = "https://plaid-backend.vercel.app";
+
+      async function createLinkToken() {
+        const res = await fetch(`${BACKEND_URL}/api/create_link_token`);
+        const data = await res.json();
+        return data.link_token;
+      }
+
+      async function initPlaid() {
+        const linkToken = await createLinkToken();
+
+        const handler = Plaid.create({
+          token: linkToken,
+          onSuccess: async (public_token, metadata) => {
+            const email = document.getElementById("email").value;
+            if (!email) {
+              al
