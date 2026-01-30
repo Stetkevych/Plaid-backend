@@ -21,7 +21,7 @@
         padding: 40px;
         border-radius: 12px;
         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
-        max-width: 420px;
+        max-width: 520px;
         width: 100%;
         text-align: center;
       }
@@ -93,22 +93,23 @@
           const handler = Plaid.create({
             token: linkToken,
             onSuccess: async (public_token) => {
-                // 1) exchange
-                const exRes = await fetch("/api/exchange_token", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ public_token, user_email: email }),
-                });
-                const exData = await exRes.json();
+              const email = (emailEl.value || "").trim();
+              if (!email) {
+                alert("Please enter your email first.");
+                return;
+              }
 
-                // 2) notify
-                await fetch("/api/notify", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ user_email: email, item_id: exData.item_id }),
-                });
-              alert("Connected! Next: exchange token + notify email.");
-              console.log("public_token:", public_token);
+              // Exchange token (server-side)
+              const exRes = await fetch("/api/exchange_token", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ public_token, user_email: email })
+              });
+
+              const exText = await exRes.text();
+              if (!exRes.ok) throw new Error(exText || "Exchange failed");
+
+              alert("Bank connected successfully. Next: email pipeline.");
             },
             onExit: (err) => { if (err) console.error(err); }
           });
