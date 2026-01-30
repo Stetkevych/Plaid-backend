@@ -13,6 +13,19 @@ const plaidClient = new PlaidApi(
 );
 
 export default async function handler(req, res) {
+  // ✅ Browser test endpoint
+  if (req.method === "GET") {
+    return res.status(200).json({
+      ok: true,
+      env: {
+        PLAID_ENV: process.env.PLAID_ENV || null,
+        HAS_CLIENT_ID: Boolean(process.env.PLAID_CLIENT_ID),
+        HAS_SECRET: Boolean(process.env.PLAID_SECRET),
+      },
+    });
+  }
+
+  // ✅ Plaid Link token creation
   if (req.method !== "POST") return res.status(405).end();
 
   try {
