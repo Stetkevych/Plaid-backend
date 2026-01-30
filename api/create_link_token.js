@@ -13,10 +13,7 @@ const client = new PlaidApi(
 );
 
 export default async function handler(req, res) {
-  // Simple health check
   if (req.method === "GET") return res.status(200).json({ ok: true });
-
-  // Browser must POST
   if (req.method !== "POST") return res.status(405).end();
 
   try {
@@ -25,13 +22,13 @@ export default async function handler(req, res) {
       client_name: "Connect Your Bank",
       products: ["auth", "transactions"],
       country_codes: ["US"],
-      language: "en"
+      language: "en",
     });
 
     return res.status(200).json({ link_token: response.data.link_token });
   } catch (err) {
     return res.status(500).json({
-      error: err?.response?.data || err?.message || "Unknown error"
+      error: err?.response?.data || err?.message || "Unknown error",
     });
   }
 }
