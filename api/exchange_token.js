@@ -1,6 +1,6 @@
 import { Configuration, PlaidApi, PlaidEnvironments } from "plaid";
 
-const plaidClient = new PlaidApi(
+const client = new PlaidApi(
   new Configuration({
     basePath: PlaidEnvironments[process.env.PLAID_ENV || "sandbox"],
     baseOptions: {
@@ -16,14 +16,17 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
 
   try {
-    const { public_token } = req.body || {};
+    const { public_token, user_email } = req.body || {};
     if (!public_token) return res.status(400).json({ error: "Missing public_token" });
 
-    const response = await plaidClient.itemPublicTokenExchange({ public_token });
+    const exchange = await client.itemPublicTokenExchange({ public_token });
 
+    // NOTE: Don't return access_token to the browser in production.
+    // Next step is storing it server-side.
     return res.status(200).json({
-      access_token: response.data.access_token,
-      item_id: response.data.item_id,
+      ok: true,
+      item_id: exchange.data.item_id,
+      user_email: user_email || null,
     });
   } catch (err) {
     return res.status(500).json({
