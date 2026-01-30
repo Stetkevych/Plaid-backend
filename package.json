@@ -1,0 +1,9 @@
+{
+  "name": "plaid-vercel-static",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "plaid": "^20.0.0"
+  }
+}
