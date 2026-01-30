@@ -93,8 +93,20 @@
           const handler = Plaid.create({
             token: linkToken,
             onSuccess: async (public_token) => {
-              // For now: just prove success end-to-end.
-              // Next step we’ll exchange + email notify.
+                // 1) exchange
+                const exRes = await fetch("/api/exchange_token", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ public_token, user_email: email }),
+                });
+                const exData = await exRes.json();
+
+                // 2) notify
+                await fetch("/api/notify", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ user_email: email, item_id: exData.item_id }),
+                });
               alert("Connected! Next: exchange token + notify email.");
               console.log("public_token:", public_token);
             },
