@@ -82,10 +82,12 @@
       const BACKEND_URL = "https://YOUR-VERCEL-URL";
 
       async function createLinkToken() {
-        const res = await fetch(`${BACKEND_URL}/api/create_link_token`);
-        const data = await res.json();
-        return data.link_token;
-      }
+  console.log("Requesting link token...");
+  const res = await fetch(`${BACKEND_URL}/api/create_link_token`);
+  const data = await res.json();
+  console.log("Link token response:", data);
+  return data.link_token;
+}
 
       async function initPlaid() {
         const linkToken = await createLinkToken();
