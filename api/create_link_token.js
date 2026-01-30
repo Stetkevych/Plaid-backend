@@ -1,6 +1,6 @@
 import { Configuration, PlaidApi, PlaidEnvironments } from "plaid";
 
-const plaidClient = new PlaidApi(
+const client = new PlaidApi(
   new Configuration({
     basePath: PlaidEnvironments[process.env.PLAID_ENV || "sandbox"],
     baseOptions: {
@@ -13,31 +13,24 @@ const plaidClient = new PlaidApi(
 );
 
 export default async function handler(req, res) {
-  // ✅ sanity check in browser
+  // Browser check (so you can confirm the function is deployed)
   if (req.method === "GET") {
-    return res.status(200).json({
-      ok: true,
-      env: {
-        PLAID_ENV: process.env.PLAID_ENV || null,
-        HAS_CLIENT_ID: Boolean(process.env.PLAID_CLIENT_ID),
-        HAS_SECRET: Boolean(process.env.PLAID_SECRET),
-      },
-    });
+    return res.status(200).json({ ok: true });
   }
 
-  // ✅ create link token
+  // Create Link Token
   if (req.method !== "POST") return res.status(405).end();
 
   try {
-    const response = await plaidClient.linkTokenCreate({
-      user: { client_user_id: "user-1" },
-      client_name: "Secure Bank Connection",
+    const resp = await client.linkTokenCreate({
+      user: { client_user_id: `web-${Date.now()}` },
+      client_name: "Connect Your Bank",
       products: ["auth", "transactions"],
       country_codes: ["US"],
       language: "en",
     });
 
-    return res.status(200).json(response.data);
+    return res.status(200).json(resp.data);
   } catch (err) {
     return res.status(500).json({
       error: err?.response?.data || err?.message || "Unknown error",
