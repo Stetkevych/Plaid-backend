@@ -1,4 +1,4 @@
-import { Configuration, PlaidApi, PlaidEnvironments } from "plaid";
+import { Configuration, PlaidApi, PlaidEnvironments } from  "plaid";
 
 const client = new PlaidApi(
   new Configuration({
